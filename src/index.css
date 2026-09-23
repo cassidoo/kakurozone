@@ -1167,10 +1167,11 @@ footer a[aria-current='page'] {
   .site-header {
     width: calc(100% - 20px);
     margin-top: 10px;
-    padding-left: 12px;
+    min-height: 0;
+    padding: 6px 10px 6px 12px;
     align-items: stretch;
     flex-direction: column;
-    gap: 7px;
+    gap: 4px;
   }
 
   .wordmark {
@@ -1181,7 +1182,7 @@ footer a[aria-current='page'] {
   nav {
     justify-content: space-between;
     border-top: 2px solid var(--ink);
-    padding-top: 6px;
+    padding-top: 4px;
   }
 
   nav button,
@@ -1298,7 +1299,8 @@ footer a[aria-current='page'] {
     width: calc(100% - 20px);
     margin-inline: auto;
     grid-template-columns: auto 1fr auto;
-    gap: 10px;
+    gap: 6px;
+    margin-bottom: 14px;
   }
 
   .player-heading h1 {
@@ -1323,17 +1325,29 @@ footer a[aria-current='page'] {
   }
 
   .game-layout {
-    gap: 33px;
+    gap: 14px;
   }
 
   .controls-panel {
     width: calc(100% - 20px);
-    padding: 16px;
+    padding: 12px;
     box-shadow: 5px 5px 0 var(--ink);
   }
 
+  .clue-legend,
   .game-message {
-    padding-inline: 12px;
+    display: none;
+  }
+
+  .keypad {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .keypad button {
+    min-height: 44px;
+    height: 44px;
+    font-size: 1.1rem;
   }
 
   footer {
