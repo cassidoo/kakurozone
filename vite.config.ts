@@ -9,7 +9,8 @@ const offlineShell = (): Plugin => ({
   enforce: 'post',
   generateBundle(_options, bundle) {
     // Include lazy PDF code and generation workers even on archive-first installs.
-    const assets = ['/', '/manifest.webmanifest', '/icon.svg',
+    const assets = ['/', '/manifest.webmanifest', '/icon.svg', '/favicon.ico',
+      '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png',
       ...Object.keys(bundle).filter((name) => /\.(js|css)$/.test(name)).sort().map((name) => `/${name}`),
     ]
     const template = readFileSync(new URL('./scripts/service-worker.js', import.meta.url), 'utf8')
