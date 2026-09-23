@@ -8,6 +8,7 @@ describe('versioned puzzle routing', () => {
     ['#archive', 'archive'],
     ['#print', 'print'],
     ['#how-to-play', 'how-to-play'],
+    ['#colophon', 'colophon'],
   ])('opens the top-level route %s without a puzzle reference', (hash, view) => {
     expect(parsePuzzleRoute(hash)).toEqual({ view })
   })

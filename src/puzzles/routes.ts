@@ -7,7 +7,7 @@ export interface PuzzleReference {
 }
 
 export type PuzzleRoute =
-  | { readonly view: 'home' | 'archive' | 'how-to-play' }
+  | { readonly view: 'home' | 'archive' | 'how-to-play' | 'colophon' }
   | { readonly view: 'print'; readonly puzzle?: PuzzleReference }
   | { readonly view: 'play'; readonly puzzle: PuzzleReference }
   | { readonly view: 'not-found' }
@@ -25,6 +25,7 @@ export const parsePuzzleRoute = (hash: string): PuzzleRoute => {
   if (!path) return { view: 'home' }
   if (path === 'archive') return { view: 'archive' }
   if (path === 'how-to-play') return { view: 'how-to-play' }
+  if (path === 'colophon') return { view: 'colophon' }
   if (path === 'print') return { view: 'print' }
   const match = /^(play|print)\/(?:(v2)\/)?(\d{4}-\d{2}-\d{2})\/(7|9)$/.exec(path)
   if (!match || !isDateSeed(match[3])) return { view: 'not-found' }

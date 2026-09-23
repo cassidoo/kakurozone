@@ -18,6 +18,7 @@ import { ClueCell } from './components/ClueCell'
 import { PuzzleCelebration, PuzzleStatus } from './components/PuzzleFeedback'
 import { SolvedActions } from './components/SolvedActions'
 import { HowToPlay } from './components/HowToPlay'
+import { Colophon } from './components/Colophon'
 import { archivePuzzles } from './puzzles/catalogue'
 import { localDateSeed, parsePuzzleRoute, puzzlePath, type PuzzleRoute } from './puzzles/routes'
 import { usePuzzle } from './puzzles/usePuzzle'
@@ -750,6 +751,8 @@ export default function App() {
         <Archive />
       ) : route.view === 'how-to-play' ? (
         <HowToPlay />
+      ) : route.view === 'colophon' ? (
+        <Colophon />
       ) : route.view === 'not-found' ? (
         <main className="puzzle-loading">
           <h1>Puzzle not found</h1>
@@ -780,8 +783,15 @@ export default function App() {
         </main>
       )}
       <footer>
-        <strong>KAKURO ZONE</strong>
-        <span>Deterministic daily number puzzles. Progress stays on this device.</span>
+        <a href="https://cassidoo.co" target="_blank" rel="noreferrer">
+          Built by cassidoo
+        </a>
+        <a
+          href="#colophon"
+          aria-current={route.view === 'colophon' ? 'page' : undefined}
+        >
+          Colophon
+        </a>
       </footer>
     </>
   )

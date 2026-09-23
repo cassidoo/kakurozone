@@ -174,13 +174,15 @@ h2 {
   text-underline-offset: 4px;
 }
 
-.how-to-page {
+.how-to-page,
+.colophon-page {
   max-width: 760px;
   padding-bottom: 64px;
   line-height: 1.65;
 }
 
-.how-to-page > .page-heading {
+.how-to-page > .page-heading,
+.colophon-page > .page-heading {
   display: block;
   margin-bottom: 36px;
 }
@@ -192,14 +194,23 @@ h2 {
   line-height: inherit;
 }
 
-.how-to-page section {
+.how-to-page section,
+.colophon-page section {
   margin-bottom: 36px;
 }
 
-.how-to-page h2 {
+.how-to-page h2,
+.colophon-page h2 {
   font-size: clamp(1.25rem, 4vw, 1.6rem);
   line-height: 1.2;
   margin-bottom: 16px;
+}
+
+.colophon-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-left: 24px;
 }
 
 .clue-directions {
@@ -1059,14 +1070,27 @@ footer {
   margin: 0 auto 18px;
   padding: 18px 0 4px;
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
+  justify-content: center;
+  gap: 16px;
   border-top: 2px solid var(--ink);
   font-size: 0.72rem;
 }
 
-footer span {
+footer a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
   color: var(--muted);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+footer a:hover,
+footer a[aria-current='page'] {
+  color: var(--ink);
 }
 
 @media (max-width: 900px) {
@@ -1279,7 +1303,6 @@ footer span {
 
   footer {
     width: calc(100% - 20px);
-    flex-direction: column;
     gap: 6px;
   }
 }
