@@ -1,5 +1,7 @@
 # Kakuro Zone
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/66336b93-2c29-416e-83a9-3da3c29a7e2b/deploy-status)](https://app.netlify.com/projects/kakurozone/deploys)
+
 A kakuro puzzle website for daily fun, with printable puzzle packs.
 
 [Play now!](https://kakurozone.netlify.app/)
