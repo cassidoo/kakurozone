@@ -24,9 +24,11 @@ export const Colophon = () => (
     <section aria-labelledby="puzzle-stack">
       <h2 id="puzzle-stack">Puzzle system</h2>
       <p>
-        Daily puzzles are generated from the local calendar date. Archive puzzles
-        are pre-generated from deterministic seeds, with logical uniqueness checks
-        and printable answer pages.
+        Daily puzzles are generated from the local calendar date. The archive starts
+        with 300 pre-generated puzzles and grows each day as yesterday's daily puzzle
+        joins it. Past dates are generated on demand from the same deterministic seeds,
+        with logical uniqueness checks and printable answer pages. No daily rebuild
+        or account is needed, and missed days remain available.
       </p>
     </section>
   </main>

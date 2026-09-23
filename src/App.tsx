@@ -19,8 +19,10 @@ import { PuzzleCelebration, PuzzleStatus } from './components/PuzzleFeedback'
 import { SolvedActions } from './components/SolvedActions'
 import { HowToPlay } from './components/HowToPlay'
 import { Colophon } from './components/Colophon'
-import { archivePuzzles } from './puzzles/catalogue'
-import { localDateSeed, parsePuzzleRoute, puzzlePath, type PuzzleRoute } from './puzzles/routes'
+import { archiveEntryForPuzzle, getArchiveEntries, type ArchiveEntry } from './puzzles/catalogue'
+import { parsePuzzleRoute, puzzlePath, referencePath, type PuzzleRoute } from './puzzles/routes'
+import { loadPuzzle } from './puzzles/loader'
+import { useLocalDate } from './puzzles/useLocalDate'
 import { usePuzzle } from './puzzles/usePuzzle'
 
 type View = PuzzleRoute['view']
@@ -47,6 +49,7 @@ const formatDate = (seed: string, long = false): string =>
     weekday: long ? 'long' : 'short',
     month: long ? 'long' : 'short',
     day: 'numeric',
+    year: long ? undefined : 'numeric',
   }).format(dateFromSeed(seed))
 
 const progressKey = (puzzle: KakuroPuzzle): string => `kakuro-zone:${puzzle.id}`
@@ -110,9 +113,9 @@ const AppHeader = ({ view }: { readonly view: View }) => (
   </header>
 )
 
-const DifficultyBadge = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => (
-  <span className={`difficulty difficulty-${puzzle.metadata.score}`}>
-    {puzzle.metadata.difficulty}
+const DifficultyBadge = ({ difficulty }: { readonly difficulty: Difficulty }) => (
+  <span className={`difficulty difficulty-${{ Easy: 1, Medium: 2, Hard: 3 }[difficulty]}`}>
+    {difficulty}
   </span>
 )
 
@@ -152,7 +155,7 @@ const Home = ({ today }: { readonly today: KakuroPuzzle }) => (
     <section className="daily-ticket" aria-labelledby="daily-title">
       <div className="ticket-topline">
         <span>{formatDate(today.seed, true)}</span>
-        <DifficultyBadge puzzle={today} />
+        <DifficultyBadge difficulty={today.metadata.difficulty} />
       </div>
       <div className="daily-preview">
         <MiniBoard puzzle={today} />
@@ -199,11 +202,61 @@ const DifficultyPicker = ({
   </div>
 )
 
-const Archive = () => {
+const CATALOGUE_PAGE_SIZE = 24
+
+const useCataloguePage = (entries: readonly ArchiveEntry[], initialKey?: string) => {
   const [difficulty, setDifficulty] = useState<DifficultyFilter>('All')
-  const puzzles = archivePuzzles.filter((puzzle) =>
-    difficulty === 'All' || puzzle.metadata.difficulty === difficulty,
+  const [requestedPage, setPage] = useState(() =>
+    Math.floor(Math.max(0, entries.findIndex(({ key }) => key === initialKey)) / CATALOGUE_PAGE_SIZE),
   )
+  const filtered = entries.filter((entry) =>
+    difficulty === 'All' || entry.difficulty === difficulty,
+  )
+  const page = Math.min(requestedPage, Math.max(0, Math.ceil(filtered.length / CATALOGUE_PAGE_SIZE) - 1))
+  return {
+    difficulty,
+    changeDifficulty: (value: DifficultyFilter) => {
+      setDifficulty(value)
+      setPage(0)
+    },
+    page,
+    setPage,
+    total: filtered.length,
+    visible: filtered.slice(page * CATALOGUE_PAGE_SIZE, (page + 1) * CATALOGUE_PAGE_SIZE),
+  }
+}
+
+const CataloguePagination = ({ page, total, setPage }: {
+  readonly page: number
+  readonly total: number
+  readonly setPage: (page: number) => void
+}) => (
+  <nav className="catalogue-pagination" aria-label="Puzzle pages">
+    <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Newer</button>
+    <span role="status">
+      {page * CATALOGUE_PAGE_SIZE + 1}-{Math.min((page + 1) * CATALOGUE_PAGE_SIZE, total)} of {total} puzzles
+    </span>
+    <button
+      type="button"
+      disabled={(page + 1) * CATALOGUE_PAGE_SIZE >= total}
+      onClick={() => setPage(page + 1)}
+    >
+      Older
+    </button>
+  </nav>
+)
+
+const CataloguePreview = ({ entry }: { readonly entry: ArchiveEntry }) => {
+  const state = usePuzzle(entry.reference, 'preview')
+  return state.status === 'ready' ? <MiniBoard puzzle={state.puzzle} /> : (
+    <span className="catalogue-preview-placeholder" aria-hidden="true">
+      {state.status === 'error' ? 'Preview unavailable' : 'Loading preview...'}
+    </span>
+  )
+}
+
+const Archive = ({ entries }: { readonly entries: readonly ArchiveEntry[] }) => {
+  const catalogue = useCataloguePage(entries)
 
   return (
     <main className="archive-page">
@@ -216,22 +269,23 @@ const Archive = () => {
           </button>
         </div>
       </div>
-      <DifficultyPicker id="archive-difficulty" value={difficulty} onChange={setDifficulty} />
+      <DifficultyPicker id="archive-difficulty" value={catalogue.difficulty} onChange={catalogue.changeDifficulty} />
+      <CataloguePagination {...catalogue} />
       <div className="archive-grid">
-        {puzzles.map((puzzle) => (
+        {catalogue.visible.map((entry) => (
           <button
             className="archive-card"
             type="button"
-            key={puzzle.id}
-            onClick={() => navigate(puzzlePath(puzzle))}
+            key={entry.key}
+            onClick={() => navigate(referencePath(entry.reference))}
           >
             <span className="archive-date">
-              {formatDate(puzzle.seed)}
+              {formatDate(entry.reference.seed)}
             </span>
-            <MiniBoard puzzle={puzzle} />
+            <CataloguePreview entry={entry} />
             <span className="archive-meta">
-              <strong>{puzzle.size}×{puzzle.size}</strong>
-              <DifficultyBadge puzzle={puzzle} />
+              <strong>{entry.reference.size}×{entry.reference.size}</strong>
+              <DifficultyBadge difficulty={entry.difficulty} />
             </span>
           </button>
         ))}
@@ -253,21 +307,23 @@ const downloadPdf = (bytes: Uint8Array, fileName: string): void => {
 }
 
 const PrintCenter = ({
-  initialPuzzle,
+  initialPuzzle, entries,
 }: {
   readonly initialPuzzle?: KakuroPuzzle
+  readonly entries: readonly ArchiveEntry[]
 }) => {
   const puzzles = useMemo(() => {
-    if (!initialPuzzle || archivePuzzles.some((puzzle) => puzzle.id === initialPuzzle.id)) {
-      return archivePuzzles
+    const initialEntry = initialPuzzle ? archiveEntryForPuzzle(initialPuzzle) : undefined
+    if (!initialEntry || entries.some((entry) => entry.key === initialEntry.key)) {
+      return entries
     }
-    return [initialPuzzle, ...archivePuzzles]
-  }, [initialPuzzle])
-  const [difficulty, setDifficulty] = useState<DifficultyFilter>('All')
+    return [initialEntry, ...entries]
+  }, [initialPuzzle, entries])
+  const catalogue = useCataloguePage(puzzles, initialPuzzle ? archiveEntryForPuzzle(initialPuzzle).key : undefined)
   const [paperSize, setPaperSize] = useState<PaperSize>('letter')
   const [packSize, setPackSize] = useState<PackSize>(8)
   const [selectedIds, setSelectedIds] = useState<readonly string[]>(() =>
-    initialPuzzle ? [initialPuzzle.id] : puzzles.slice(0, 8).map(({ id }) => id),
+    initialPuzzle ? [archiveEntryForPuzzle(initialPuzzle).key] : puzzles.slice(0, 8).map(({ key }) => key),
   )
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState(
@@ -276,7 +332,7 @@ const PrintCenter = ({
       : 'The latest eight puzzles are selected.',
   )
   const [error, setError] = useState(false)
-  const selectedPuzzles = puzzles.filter(({ id }) => selectedIds.includes(id))
+  const selectedPuzzles = puzzles.filter(({ key }) => selectedIds.includes(key))
 
   const changePackSize = (size: PackSize): void => {
     setPackSize(size)
@@ -285,10 +341,10 @@ const PrintCenter = ({
     setMessage(`${Math.min(selectedIds.length, size)} of ${size} puzzles selected.`)
   }
 
-  const togglePuzzle = (puzzle: KakuroPuzzle): void => {
+  const togglePuzzle = (entry: ArchiveEntry): void => {
     setError(false)
-    if (selectedIds.includes(puzzle.id)) {
-      setSelectedIds(selectedIds.filter((id) => id !== puzzle.id))
+    if (selectedIds.includes(entry.key)) {
+      setSelectedIds(selectedIds.filter((id) => id !== entry.key))
       setMessage(`${selectedIds.length - 1} of ${packSize} puzzles selected.`)
       return
     }
@@ -299,22 +355,23 @@ const PrintCenter = ({
       )
       return
     }
-    setSelectedIds([...selectedIds, puzzle.id])
+    setSelectedIds([...selectedIds, entry.key])
     setMessage(`${selectedIds.length + 1} of ${packSize} puzzles selected.`)
   }
 
-  const exportIndividual = async (puzzle: KakuroPuzzle): Promise<void> => {
-    setBusy(puzzle.id)
+  const exportIndividual = async (entry: ArchiveEntry): Promise<void> => {
+    setBusy(entry.key)
     setError(false)
-    setMessage(`Building ${puzzle.seed}…`)
+    setMessage(`Building ${entry.reference.seed}…`)
     try {
+      const puzzle = await loadPuzzle(entry.reference)
       const { buildIndividualPuzzlePdf } = await import('./print/pdf')
       const bytes = await buildIndividualPuzzlePdf(puzzle, paperSize)
       downloadPdf(bytes, `kakuro-${puzzle.seed}-${paperSize}.pdf`)
       setMessage(`Downloaded ${puzzle.seed} with its solution page.`)
-    } catch {
+    } catch (error) {
       setError(true)
-      setMessage('The PDF could not be built. Please try again.')
+      setMessage(`The PDF could not be built. ${error instanceof Error ? error.message : 'Please try again.'}`)
     } finally {
       setBusy(null)
     }
@@ -326,16 +383,17 @@ const PrintCenter = ({
     setError(false)
     setMessage(`Building your ${packSize}-puzzle pack…`)
     try {
+      const generated = await Promise.all(selectedPuzzles.map((entry) => loadPuzzle(entry.reference)))
       const { buildPuzzlePackPdf } = await import('./print/pdf')
-      const bytes = await buildPuzzlePackPdf(selectedPuzzles, paperSize)
+      const bytes = await buildPuzzlePackPdf(generated, paperSize)
       downloadPdf(bytes, `kakuro-${packSize}-pack-${paperSize}.pdf`)
       const puzzlePages = Math.ceil(packSize / 4)
       setMessage(
         `Downloaded ${puzzlePages} puzzle page${puzzlePages === 1 ? '' : 's'} and one solutions page.`,
       )
-    } catch {
+    } catch (error) {
       setError(true)
-      setMessage('The PDF could not be built. Please try again.')
+      setMessage(`The PDF could not be built. ${error instanceof Error ? error.message : 'Please try again.'}`)
     } finally {
       setBusy(null)
     }
@@ -356,6 +414,7 @@ const PrintCenter = ({
               <select
                 id="pack-size"
                 value={packSize}
+                disabled={busy !== null}
                 onChange={(event) =>
                   changePackSize(Number(event.target.value) as PackSize)
                 }
@@ -372,6 +431,7 @@ const PrintCenter = ({
               <select
                 id="paper-size"
                 value={paperSize}
+                disabled={busy !== null}
                 onChange={(event) => setPaperSize(event.target.value as PaperSize)}
               >
                 <option value="letter">US Letter</option>
@@ -405,33 +465,35 @@ const PrintCenter = ({
         {message}
       </p>
 
-      <DifficultyPicker id="print-difficulty" value={difficulty} onChange={setDifficulty} />
+      <DifficultyPicker id="print-difficulty" value={catalogue.difficulty} onChange={catalogue.changeDifficulty} />
+      <CataloguePagination {...catalogue} />
       <section className="print-grid" aria-label="Archive puzzles">
-        {puzzles.filter((puzzle) => difficulty === 'All' || puzzle.metadata.difficulty === difficulty).map((puzzle) => {
-          const selected = selectedIds.includes(puzzle.id)
+        {catalogue.visible.map((entry) => {
+          const selected = selectedIds.includes(entry.key)
           return (
-            <article className={`print-card ${selected ? 'print-card-selected' : ''}`} key={puzzle.id}>
+            <article className={`print-card ${selected ? 'print-card-selected' : ''}`} key={entry.key}>
               <label>
                 <input
                   type="checkbox"
                   checked={selected}
-                  onChange={() => togglePuzzle(puzzle)}
+                  disabled={busy !== null}
+                  onChange={() => togglePuzzle(entry)}
                 />
                 <span className="print-card-date">
-                  {formatDate(puzzle.seed)}
+                  {formatDate(entry.reference.seed)}
                 </span>
-                <MiniBoard puzzle={puzzle} />
+                <CataloguePreview entry={entry} />
                 <span className="archive-meta">
-                  <strong>{puzzle.size}×{puzzle.size}</strong>
-                  <DifficultyBadge puzzle={puzzle} />
+                  <strong>{entry.reference.size}×{entry.reference.size}</strong>
+                  <DifficultyBadge difficulty={entry.difficulty} />
                 </span>
               </label>
               <button
                 type="button"
                 disabled={busy !== null}
-                onClick={() => void exportIndividual(puzzle)}
+                onClick={() => void exportIndividual(entry)}
               >
-                {busy === puzzle.id ? 'Building…' : 'Download single PDF'}
+                {busy === entry.key ? 'Building…' : 'Download single PDF'}
               </button>
             </article>
           )
@@ -645,7 +707,7 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
           <h1>{formatDate(puzzle.seed, true)}</h1>
           <p>{puzzle.size}×{puzzle.size} · {completedCount}/{puzzle.metadata.playableCells} filled</p>
         </div>
-        <DifficultyBadge puzzle={puzzle} />
+        <DifficultyBadge difficulty={puzzle.metadata.difficulty} />
       </div>
       {puzzle.metadata.generator === 'seeded-tile-family-v1' && (
         <p className="classic-notice">
@@ -732,7 +794,8 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
 
 export default function App() {
   const [route, setRoute] = useState(getHashRoute)
-  const todaySeed = localDateSeed()
+  const todaySeed = useLocalDate()
+  const entries = useMemo(() => getArchiveEntries(todaySeed), [todaySeed])
   const reference = route.view === 'home'
     ? { version: 2 as const, seed: todaySeed, size: puzzleSizeForSeed(todaySeed) }
     : route.view === 'play' || route.view === 'print' ? route.puzzle ?? null : null
@@ -748,7 +811,7 @@ export default function App() {
     <>
       <AppHeader view={route.view} />
       {route.view === 'archive' ? (
-        <Archive />
+        <Archive entries={entries} />
       ) : route.view === 'how-to-play' ? (
         <HowToPlay />
       ) : route.view === 'colophon' ? (
@@ -760,11 +823,12 @@ export default function App() {
           <button className="primary-button" type="button" onClick={() => navigate('archive')}>Browse the archive</button>
         </main>
       ) : route.view === 'print' && !route.puzzle ? (
-        <PrintCenter />
+        <PrintCenter entries={entries} />
       ) : puzzleState.status === 'ready' && route.view === 'print' ? (
         <PrintCenter
           key={puzzleState.puzzle.id}
           initialPuzzle={puzzleState.puzzle}
+          entries={entries}
         />
       ) : puzzleState.status === 'ready' && route.view === 'play' ? (
         <PuzzlePlayer key={puzzleState.puzzle.id} puzzle={puzzleState.puzzle} />

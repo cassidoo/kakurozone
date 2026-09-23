@@ -39,11 +39,24 @@ export const parsePuzzleRoute = (hash: string): PuzzleRoute => {
   }
 }
 
-export const puzzlePath = (
+export const puzzleReference = (
   puzzle: Pick<KakuroPuzzle, 'seed' | 'size'> & { readonly metadata: Pick<KakuroPuzzle['metadata'], 'generator'> },
+): PuzzleReference => ({
+  seed: puzzle.seed,
+  size: puzzle.size,
+  version: puzzle.metadata.generator === 'seeded-tile-family-v1' ? 1 : 2,
+})
+
+export const referencePath = (
+  reference: PuzzleReference,
   view: 'play' | 'print' = 'play',
 ): string =>
-  `${view}/${puzzle.metadata.generator === 'seeded-tile-family-v1' ? '' : 'v2/'}${encodeURIComponent(puzzle.seed)}/${puzzle.size}`
+  `${view}/${reference.version === 1 ? '' : 'v2/'}${encodeURIComponent(reference.seed)}/${reference.size}`
+
+export const puzzlePath = (
+  puzzle: Parameters<typeof puzzleReference>[0],
+  view: 'play' | 'print' = 'play',
+): string => referencePath(puzzleReference(puzzle), view)
 
 export const referenceKey = ({ version, seed, size }: PuzzleReference): string =>
   `${version}:${seed}:${size}`
