@@ -743,6 +743,13 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
             />
           ) : (
             <>
+              <div className="keypad" aria-label="Number keypad">
+                {Array.from({ length: 9 }, (_, index) => index + 1).map((digit) => (
+                  <button type="button" key={digit} onClick={() => enterDigit(digit)}>
+                    {digit}
+                  </button>
+                ))}
+              </div>
               <div className="control-toprow">
                 <button type="button" onClick={undo} disabled={past.length === 0} aria-label="Undo">
                   <span aria-hidden="true">↶</span> Undo
@@ -750,13 +757,6 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
                 <button type="button" onClick={redo} disabled={future.length === 0} aria-label="Redo">
                   <span aria-hidden="true">↷</span> Redo
                 </button>
-              </div>
-              <div className="keypad" aria-label="Number keypad">
-                {Array.from({ length: 9 }, (_, index) => index + 1).map((digit) => (
-                  <button type="button" key={digit} onClick={() => enterDigit(digit)}>
-                    {digit}
-                  </button>
-                ))}
               </div>
               <div className="control-actions">
                 <button
