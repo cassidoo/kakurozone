@@ -1,8 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#dfff43"/>
-  <rect x="72" y="72" width="368" height="368" fill="#fffdf7" stroke="#171715" stroke-width="28"/>
-  <path d="M72 256h368M256 72v368" stroke="#171715" stroke-width="28"/>
-  <path d="M72 72l184 184" stroke="#171715" stroke-width="18"/>
-  <text x="308" y="208" font-family="Arial,sans-serif" font-size="96" font-weight="900" text-anchor="middle" fill="#171715">9</text>
-  <text x="164" y="384" font-family="Arial,sans-serif" font-size="96" font-weight="900" text-anchor="middle" fill="#171715">7</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">KZ</title>
+  <rect x="0.000" y="0.000" width="512.000" height="512.000" fill="#dfff43"/>
+  <path fill="#171715" d="M184.300 152.800 L266.500 152.800 L192.400 237.700 L268.000 359.200 L189.700 359.200 L146.800 283.600 L110.800 313.000 L110.800 359.200 L44.500 359.200 L44.500 152.800 L110.800 152.800 L110.800 241.000 Z M369.400 309.700 L467.500 309.700 L467.500 359.200 L267.400 359.200 L267.400 337.900 L363.100 202.300 L274.600 202.300 L274.600 152.800 L465.100 152.800 L465.100 174.100 Z"/>
 </svg>

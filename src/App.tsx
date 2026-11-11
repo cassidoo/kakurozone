@@ -78,7 +78,7 @@ const navigate = (path: string): void => {
 const AppHeader = ({ view }: { readonly view: View }) => (
   <header className="site-header">
     <button className="wordmark" type="button" onClick={() => navigate('')}>
-      KAKURO <span>ZONE</span>
+      <span>KAKURO</span> ZONE
     </button>
     <nav aria-label="Primary navigation">
       <button
