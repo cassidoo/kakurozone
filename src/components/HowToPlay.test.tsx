@@ -34,4 +34,18 @@ describe('How to play', () => {
     expect(markup).toContain('Check my grid flags mistakes when you ask.')
     expect(markup).toContain('href="#">Try today’s puzzle</a>')
   })
+
+  it('explains navigation, notes restrictions, and undoable resets', () => {
+    const markup = renderToStaticMarkup(<HowToPlay />)
+    for (const text of [
+      'arrow keys, WASD, or HJKL',
+      'Navigation skips shaded squares',
+      'Notes are disabled on filled squares.',
+      'press Backspace or Delete',
+      'previous open square',
+      'Erase all button resets every number and note',
+      'after confirmation.',
+      'including resets.',
+    ]) expect(markup).toContain(text)
+  })
 })

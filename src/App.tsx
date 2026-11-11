@@ -1,8 +1,10 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
+  type Ref,
 } from 'react'
 import {
   coordinateKey,
@@ -38,6 +40,13 @@ interface StoredProgress extends BoardState {
 }
 
 const EMPTY_BOARD: BoardState = { values: {}, notes: {} }
+
+const KEY_DIRECTIONS: Readonly<Record<string, readonly [number, number]>> = {
+  arrowleft: [0, -1], h: [0, -1], a: [0, -1],
+  arrowdown: [1, 0], j: [1, 0], s: [1, 0],
+  arrowup: [-1, 0], k: [-1, 0], w: [-1, 0],
+  arrowright: [0, 1], l: [0, 1], d: [0, 1],
+}
 
 const dateFromSeed = (seed: string): Date => {
   const [year = 2026, month = 1, day = 1] = seed.split('-').map(Number)
@@ -510,6 +519,7 @@ const PuzzleBoard = ({
   incorrect,
   readOnly,
   onSelect,
+  ref,
 }: {
   readonly puzzle: KakuroPuzzle
   readonly board: BoardState
@@ -517,8 +527,10 @@ const PuzzleBoard = ({
   readonly incorrect: ReadonlySet<string>
   readonly readOnly: boolean
   readonly onSelect: (key: string) => void
+  readonly ref: Ref<HTMLDivElement>
 }) => (
   <div
+    ref={ref}
     className="puzzle-board"
     role="grid"
     aria-readonly={readOnly}
@@ -543,11 +555,14 @@ const PuzzleBoard = ({
             type="button"
             role="gridcell"
             disabled={readOnly}
+            tabIndex={selected === key ? 0 : -1}
+            data-cell-key={key}
             aria-selected={selected === key}
             aria-invalid={incorrect.has(key)}
             aria-label={`Row ${rowIndex + 1}, column ${colIndex + 1}${value ? `, ${value}` : ', empty'}${notes.length ? `, notes ${notes.join(', ')}` : ''}`}
             className={`play-cell ${selected === key ? 'selected' : ''} ${incorrect.has(key) ? 'incorrect' : ''}`}
             onClick={() => onSelect(key)}
+            onFocus={() => onSelect(key)}
           >
             {value !== undefined ? (
               <span className="cell-number">{value}</span>
@@ -566,6 +581,7 @@ const PuzzleBoard = ({
 )
 
 const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
+  const boardRef = useRef<HTMLDivElement>(null)
   const initial = useMemo(() => loadProgress(puzzle), [puzzle])
   const [board, setBoard] = useState<BoardState>(initial)
   const [past, setPast] = useState<readonly BoardState[]>([])
@@ -577,6 +593,12 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
   const [noteMode, setNoteMode] = useState(false)
   const [incorrect, setIncorrect] = useState<ReadonlySet<string>>(new Set())
   const [message, setMessage] = useState('Pick a square to begin.')
+  const selectedHasValue = selected !== null && board.values[selected] !== undefined
+  const selectedHasContent = selected !== null &&
+    (selectedHasValue || (board.notes[selected]?.length ?? 0) > 0)
+  const notesActive = noteMode && !selectedHasValue
+  const hasProgress = Object.keys(board.values).length > 0 ||
+    Object.values(board.notes).some((notes) => notes.length > 0)
   const validation = useMemo(
     () => validateSolution(puzzle, board.values),
     [puzzle, board.values],
@@ -606,10 +628,29 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
     setMessage('Keep going—every run needs unique digits.')
   }
 
+  const selectCell = (key: string): void => {
+    setSelected(key)
+    boardRef.current?.querySelector<HTMLButtonElement>(`[data-cell-key="${key}"]`)?.focus()
+  }
+
+  const moveSelection = ([rowStep, colStep]: readonly [number, number]): void => {
+    if (!selected) return
+    let [row, col] = selected.split(':').map(Number)
+    row += rowStep
+    col += colStep
+    while (row >= 0 && row < puzzle.size && col >= 0 && col < puzzle.size) {
+      if (puzzle.cells[row]?.[col]?.kind === 'play') {
+        selectCell(`${row}:${col}`)
+        return
+      }
+      row += rowStep
+      col += colStep
+    }
+  }
+
   const enterDigit = (digit: number): void => {
     if (validation.valid || !selected) return
-    if (noteMode) {
-      if (board.values[selected] !== undefined) return
+    if (notesActive) {
       const existing = board.notes[selected] ?? []
       const nextNotes = existing.includes(digit)
         ? existing.filter((value) => value !== digit)
@@ -625,16 +666,25 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
     const nextEmpty = playableKeys
       .slice(currentIndex + 1)
       .find((key) => board.values[key] === undefined)
-    if (nextEmpty) setSelected(nextEmpty)
+    if (nextEmpty) selectCell(nextEmpty)
   }
 
   const erase = (): void => {
-    if (!selected) return
+    if (validation.valid || !selected || !selectedHasContent) return
     const values = { ...board.values }
     const notes = { ...board.notes }
     delete values[selected]
     delete notes[selected]
     commit({ values, notes })
+    const previous = playableKeys[playableKeys.indexOf(selected) - 1]
+    selectCell(previous ?? selected)
+  }
+
+  const eraseAll = (): void => {
+    if (validation.valid || !hasProgress) return
+    if (!window.confirm('Erase all numbers and notes from this puzzle? You can undo this reset.')) return
+    commit(EMPTY_BOARD)
+    setMessage('All numbers and notes erased. You can undo this reset.')
   }
 
   const undo = (): void => {
@@ -674,21 +724,29 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
     const [row, col] = target.split(':').map(Number)
     const cell = puzzle.cells[row]?.[col]
     if (cell?.kind !== 'play') return
-    setSelected(target)
+    selectCell(target)
     setMessage(`Hint: row ${row + 1}, column ${col + 1} can be ${cell.solution}.`)
   }
 
   useEffect(() => {
     if (validation.valid) return
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (/^[1-9]$/.test(event.key)) {
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
+      if (event.target instanceof HTMLElement &&
+        (event.target.isContentEditable || event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return
+      const direction = KEY_DIRECTIONS[event.key.toLowerCase()]
+      if (direction) {
+        moveSelection(direction)
+        event.preventDefault()
+      } else if (/^[1-9]$/.test(event.key)) {
         enterDigit(Number(event.key))
         event.preventDefault()
       } else if (event.key === 'Backspace' || event.key === 'Delete') {
         erase()
         event.preventDefault()
-      } else if (event.key.toLowerCase() === 'n') {
+      } else if (event.key.toLowerCase() === 'n' && !selectedHasValue) {
         setNoteMode((active) => !active)
+        event.preventDefault()
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -720,6 +778,7 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
         <section className="board-panel" aria-label="Puzzle">
           <PuzzleCelebration solved={validation.valid}>
             <PuzzleBoard
+              ref={boardRef}
               puzzle={puzzle}
               board={board}
               selected={validation.valid ? null : selected}
@@ -761,14 +820,19 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
               <div className="control-actions">
                 <button
                   type="button"
-                  className={noteMode ? 'active-control' : ''}
-                  aria-pressed={noteMode}
+                  className={notesActive ? 'active-control' : ''}
+                  aria-pressed={notesActive}
+                  disabled={!selected || selectedHasValue}
                   onClick={() => setNoteMode((active) => !active)}
                 >
-                  <span aria-hidden="true">✎</span> Notes {noteMode ? 'on' : 'off'}
+                  <span aria-hidden="true">✎</span> Notes {notesActive ? 'on' : 'off'}
                 </button>
-                <button type="button" onClick={erase}>
-                  <span aria-hidden="true">⌫</span> Erase
+                <button
+                  type="button"
+                  onClick={selectedHasContent ? erase : eraseAll}
+                  disabled={!selected || !hasProgress}
+                >
+                  <span aria-hidden="true">⌫</span> {selectedHasContent ? 'Erase' : 'Erase all'}
                 </button>
               </div>
               <button className="check-button" type="button" onClick={check}>
@@ -783,7 +847,7 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
               >
                 <span aria-hidden="true">⇩</span> Print this puzzle
               </button>
-              <p className="keyboard-tip">Keyboard: 1–9 · N for notes · Delete to erase</p>
+              <p className="keyboard-tip">Keyboard: arrows / HJKL / WASD to move · 1–9 · N for notes · Delete to erase</p>
             </>
           )}
         </aside>
