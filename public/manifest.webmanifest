@@ -1,7 +1,7 @@
 {
   "name": "Kakuro Zone",
   "short_name": "Kakuro Zone",
-  "description": "Deterministic daily Kakuro number puzzles.",
+  "description": "Daily Kakuro number puzzles.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f6f1e7",
