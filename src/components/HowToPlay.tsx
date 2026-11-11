@@ -15,6 +15,9 @@ export const HowToPlay = () => (
       <p>
         Tap an open square, then tap a number on the keypad. Use one digit
         from 1 to 9 in each square. You can also type 1–9 on a keyboard.
+        Move between squares with the arrow keys, WASD, or HJKL
+        (H left, J down, K up, L right). Navigation skips shaded squares
+        and stops at the edge of the board.
         Shaded squares hold clues or separate runs; you cannot enter numbers there.
       </p>
     </section>
@@ -77,11 +80,17 @@ export const HowToPlay = () => (
       <dl className="how-to-tools">
         <div>
           <dt>Notes</dt>
-          <dd>Turn Notes on to pencil in possible digits. Tap a digit again to remove its note.</dd>
+          <dd>Turn Notes on (or press N) to pencil in possible digits in an empty square. Tap a digit again to remove its note. Notes are disabled on filled squares.</dd>
         </div>
         <div>
           <dt>Erase, Undo &amp; Redo</dt>
-          <dd>Clear the selected square or step backward and forward through your entries.</dd>
+          <dd>
+            Erase (or press Backspace or Delete) to clear a square and move to the
+            previous open square, wrapping to the row above when needed.
+            On an empty square, the Erase all button resets every number and note
+            after confirmation. Undo and Redo step backward and forward through
+            your entries, including resets.
+          </dd>
         </div>
         <div>
           <dt>Check &amp; Hint</dt>
