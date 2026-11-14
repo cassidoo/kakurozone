@@ -28,6 +28,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   container.remove()
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -68,6 +69,35 @@ const expectSelection = (key: string) => {
 }
 
 describe('board navigation', () => {
+  it.each([0, 1])('shares a frozen solve time with %i hints after the solved badge appears', async (hintCount) => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-14T12:00:00Z'))
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    const copy = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText: copy } })
+    const solution = Object.fromEntries(puzzle.cells.flatMap((row, rowIndex) =>
+      row.flatMap((square, colIndex) => square.kind === 'play' ? [[`${rowIndex}:${colIndex}`, square.solution]] : []),
+    ))
+    const last = Object.keys(solution).at(-1)!
+    const digit = solution[last]
+    delete solution[last]
+    renderPlayer(solution)
+    expect(container.textContent).not.toContain('Solve time:')
+    if (hintCount) click(control('Give me a hint'))
+    act(() => vi.advanceTimersByTime(988000))
+    select(last)
+    press(String(digit))
+    expect(container.textContent).toContain('Solved!')
+    expect(container.textContent).toContain('Solve time: 16:28')
+    act(() => vi.advanceTimersByTime(60000))
+    expect(container.textContent).toContain('Solve time: 16:28')
+    await act(async () => control('Share').click())
+    expect(copy).toHaveBeenCalledExactlyOnceWith(
+      `Kakuro Zone\n⏱ 16:28 · ${hintCount ? '1 hint' : 'no hints'}\n${window.location.href}`,
+    )
+    expect(progress().completed).toBe(true)
+  })
+
   it.each([
     ['ArrowLeft', '2:1'], ['h', '2:1'], ['A', '2:1'],
     ['ArrowRight', '2:4'], ['l', '2:4'], ['d', '2:4'],

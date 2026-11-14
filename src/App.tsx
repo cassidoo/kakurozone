@@ -26,6 +26,7 @@ import { parsePuzzleRoute, puzzlePath, referencePath, type PuzzleRoute } from '.
 import { loadPuzzle } from './puzzles/loader'
 import { useLocalDate } from './puzzles/useLocalDate'
 import { usePuzzle } from './puzzles/usePuzzle'
+import { useSolveStats } from './useSolveStats'
 
 type View = PuzzleRoute['view']
 type Notes = Readonly<Record<string, readonly number[]>>
@@ -603,6 +604,7 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
     () => validateSolution(puzzle, board.values),
     [puzzle, board.values],
   )
+  const { stats, recordHint } = useSolveStats(progressKey(puzzle), validation.valid)
 
   const playableKeys = useMemo(
     () =>
@@ -724,6 +726,7 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
     const [row, col] = target.split(':').map(Number)
     const cell = puzzle.cells[row]?.[col]
     if (cell?.kind !== 'play') return
+    recordHint()
     selectCell(target)
     setMessage(`Hint: row ${row + 1}, column ${col + 1} can be ${cell.solution}.`)
   }
@@ -798,6 +801,7 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
           {validation.valid ? (
             <SolvedActions
               puzzle={puzzle}
+              stats={stats}
               onPrint={() => navigate(puzzlePath(puzzle, 'print'))}
             />
           ) : (
