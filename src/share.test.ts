@@ -7,6 +7,49 @@ const data = getPuzzleShareData(
 )
 
 describe('puzzle sharing', () => {
+  const solvedData = getPuzzleShareData(
+    { seed: '2026-09-21', size: 9, metadata: { generator: 'seeded-connected-v2' } },
+    'https://example.com/kakuro/',
+    { elapsedMs: 988999, hintCount: 0 },
+  )
+
+  it('copies the solve time and hint usage with the puzzle URL', async () => {
+    const copy = vi.fn().mockResolvedValue(undefined)
+    expect(await sharePuzzleLink(solvedData, { copy })).toMatchObject({ outcome: 'copied' })
+    expect(copy).toHaveBeenCalledExactlyOnceWith(
+      'Kakuro Zone\n⏱ 16:28 · no hints\nhttps://example.com/kakuro/#play/v2/2026-09-21/9',
+    )
+  })
+
+  it.each([
+    [0, 1, '0:00 · 1 hint'],
+    [3601000, 2, '60:01 · 2 hints'],
+  ])('formats %i ms with %i hints', (elapsedMs, hintCount, line) => {
+    expect(getPuzzleShareData(
+      { seed: '2026-09-21', size: 9, metadata: { generator: 'seeded-connected-v2' } },
+      'https://example.com/',
+      { elapsedMs, hintCount },
+    ).text).toBe(`Kakuro Zone\n⏱ ${line}`)
+  })
+
+  it('includes solve stats in native sharing without duplicating the URL or passing clipboard metadata', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    await sharePuzzleLink(solvedData, { share })
+    expect(share).toHaveBeenCalledExactlyOnceWith({
+      title: 'Kakuro Zone',
+      text: 'Kakuro Zone\n⏱ 16:28 · no hints',
+      url: solvedData.url,
+    })
+  })
+
+  it('asks for manual copying of the result when the clipboard fails', async () => {
+    const copy = vi.fn().mockRejectedValue(new Error('Denied'))
+    expect(await sharePuzzleLink(solvedData, { copy })).toEqual({
+      outcome: 'manual',
+      message: "Couldn't copy the result. Select and copy it below.",
+    })
+  })
+
   it('links to the played date and size, preserving the hosting path but not query state', () => {
     expect(data).toEqual({
       title: 'Kakuro Zone - 2026-09-21',
