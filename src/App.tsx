@@ -85,43 +85,99 @@ const navigate = (path: string): void => {
   window.location.hash = path
 }
 
-const AppHeader = ({ view }: { readonly view: View }) => (
-  <header className="site-header">
-    <button className="wordmark" type="button" onClick={() => navigate('')}>
-      <span>KAKURO</span> ZONE
-    </button>
-    <nav aria-label="Primary navigation">
-      <button
-        type="button"
-        className={view === 'home' ? 'nav-active' : ''}
-        onClick={() => navigate('')}
-      >
-        Today
+const AppHeader = ({ view }: { readonly view: View }) => {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !headerRef.current?.contains(event.target)) {
+        setMenuOpen(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+        toggleRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [menuOpen])
+
+  return (
+    <header
+      className="site-header"
+      ref={headerRef}
+      onBlur={(event) => {
+        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+          setMenuOpen(false)
+        }
+      }}
+    >
+      <button className="wordmark" type="button" onClick={() => {
+        setMenuOpen(false)
+        navigate('')
+      }}>
+        <span>KAKURO</span> ZONE
       </button>
       <button
+        className="nav-toggle"
         type="button"
-        className={view === 'archive' ? 'nav-active' : ''}
-        onClick={() => navigate('archive')}
+        ref={toggleRef}
+        aria-label="Menu"
+        aria-expanded={menuOpen}
+        aria-controls="primary-navigation"
+        onClick={() => setMenuOpen((open) => !open)}
       >
-        Archive
+        <span aria-hidden="true">≡</span>
       </button>
-      <button
-        type="button"
-        className={view === 'print' ? 'nav-active' : ''}
-        onClick={() => navigate('print')}
+      <nav
+        id="primary-navigation"
+        aria-label="Primary navigation"
+        className={menuOpen ? 'nav-open' : ''}
+        onClick={() => setMenuOpen(false)}
       >
-        Print
-      </button>
-      <a
-        href="#how-to-play"
-        className={view === 'how-to-play' ? 'nav-active' : ''}
-        aria-current={view === 'how-to-play' ? 'page' : undefined}
-      >
-        How to play
-      </a>
-    </nav>
-  </header>
-)
+        <button
+          type="button"
+          className={view === 'home' ? 'nav-active' : ''}
+          onClick={() => navigate('')}
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          className={view === 'archive' ? 'nav-active' : ''}
+          onClick={() => navigate('archive')}
+        >
+          Archive
+        </button>
+        <button
+          type="button"
+          className={view === 'print' ? 'nav-active' : ''}
+          onClick={() => navigate('print')}
+        >
+          Print
+        </button>
+        <a
+          href="#how-to-play"
+          className={view === 'how-to-play' ? 'nav-active' : ''}
+          aria-current={view === 'how-to-play' ? 'page' : undefined}
+        >
+          How to play
+        </a>
+      </nav>
+    </header>
+  )
+}
 
 const DifficultyBadge = ({ difficulty }: { readonly difficulty: Difficulty }) => (
   <span className={`difficulty difficulty-${{ Easy: 1, Medium: 2, Hard: 3 }[difficulty]}`}>
