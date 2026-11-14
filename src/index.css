@@ -1066,6 +1066,11 @@ h2 {
   text-align: center;
 }
 
+.solve-time {
+  margin: 0;
+  font-weight: 700;
+}
+
 .share-message {
   margin: 0;
   font-size: 0.85rem;
@@ -1084,7 +1089,8 @@ h2 {
   font-weight: 700;
 }
 
-.share-link input {
+.share-link input,
+.share-link textarea {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -1095,7 +1101,8 @@ h2 {
   font: inherit;
 }
 
-.share-link input:focus-visible {
+.share-link input:focus-visible,
+.share-link textarea:focus-visible {
   outline: 4px solid var(--coral);
   outline-offset: 3px;
 }

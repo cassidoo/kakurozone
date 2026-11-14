@@ -6,6 +6,10 @@ A kakuro puzzle website for daily fun, with printable puzzle packs.
 
 [Play now!](https://kakurozone.netlify.app/)
 
+After solving, Share includes your solve time, hint count, and puzzle link.
+Time counts only while the puzzle page is visible and is saved across visits.
+Puzzles completed before time tracking was available still share just the link.
+
 ## How to run locally
 
 With Node.js 22.12+ installed:
