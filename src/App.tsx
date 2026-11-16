@@ -8,6 +8,7 @@ import {
 } from 'react'
 import {
   coordinateKey,
+  hintCandidates,
   puzzleSizeForSeed,
   validateSolution,
   type KakuroPuzzle,
@@ -774,17 +775,27 @@ const PuzzlePlayer = ({ puzzle }: { readonly puzzle: KakuroPuzzle }) => {
   }
 
   const hint = (): void => {
-    const target = playableKeys.find((key) => board.values[key] === undefined)
-    if (!target) {
-      setMessage('This grid is already filled. Check it to see how you did.')
+    if (validation.valid) return
+    const emptyKeys = playableKeys.filter((key) => board.values[key] === undefined)
+    if (emptyKeys.length === 0) {
+      const target = validation.incorrectCells[0]
+      if (!target) return
+      const values = { ...board.values }
+      const notes = { ...board.notes }
+      delete values[target]
+      delete notes[target]
+      commit({ values, notes })
+      recordHint()
+      selectCell(target)
       return
     }
-    const [row, col] = target.split(':').map(Number)
-    const cell = puzzle.cells[row]?.[col]
-    if (cell?.kind !== 'play') return
+    const target = selected && board.values[selected] === undefined
+      ? selected
+      : emptyKeys[Math.floor(Math.random() * emptyKeys.length)]!
+    const notes = hintCandidates(puzzle, board.values, target)
+    commit({ ...board, notes: { ...board.notes, [target]: notes } })
     recordHint()
     selectCell(target)
-    setMessage(`Hint: row ${row + 1}, column ${col + 1} can be ${cell.solution}.`)
   }
 
   useEffect(() => {

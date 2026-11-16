@@ -1,4 +1,4 @@
-import type { KakuroPuzzle } from './types'
+import { coordinateKey, type CellValues, type KakuroPuzzle } from './types'
 
 export const ALL_DIGITS = 511
 export const bitCount = (mask: number): number => {
@@ -23,6 +23,34 @@ for (let mask = 1; mask <= ALL_DIGITS; mask += 1) {
 
 export const digitCombinations = (length: number, sum: number): readonly number[] =>
   combinations[length]?.[sum] ?? []
+
+export const hintCandidates = (
+  puzzle: KakuroPuzzle,
+  values: CellValues,
+  target: string,
+): readonly number[] => {
+  let candidates = ALL_DIGITS
+  for (const run of puzzle.runs) {
+    if (!run.cells.some((coordinate) => coordinateKey(coordinate) === target)) continue
+    let fixed = 0
+    for (const coordinate of run.cells) {
+      const key = coordinateKey(coordinate)
+      const cell = puzzle.cells[coordinate.row]?.[coordinate.col]
+      const value = values[key]
+      // Incorrect entries must not rule out legitimate hint candidates.
+      if (key !== target && cell?.kind === 'play' && value === cell.solution) {
+        fixed |= 1 << (value - 1)
+      }
+    }
+    let allowed = 0
+    for (const combination of digitCombinations(run.cells.length, run.sum)) {
+      if ((combination & fixed) === fixed) allowed |= combination & ~fixed
+    }
+    candidates &= allowed
+  }
+  return Array.from({ length: 9 }, (_, index) => index + 1)
+    .filter((digit) => candidates & (1 << (digit - 1)))
+}
 
 export interface ConstraintRun {
   readonly cells: readonly number[]

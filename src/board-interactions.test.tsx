@@ -4,7 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { generateLegacyPuzzle } from './engine'
+import { coordinateKey, generateLegacyPuzzle, hintCandidates } from './engine'
 
 const puzzle = generateLegacyPuzzle('2026-09-21', 7)
 const storageKey = `kakuro-zone:${puzzle.id}`
@@ -131,8 +131,9 @@ describe('board navigation', () => {
   })
 
   it('keeps focus aligned when a hint selects another square', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
     renderPlayer({ '1:1': 3 })
-    select('2:2')
+    select('1:1')
     click(control('Give me a hint'))
     expectSelection('1:2')
     press('d')
@@ -160,6 +161,148 @@ describe('board navigation', () => {
     }
     expect(cell('1:1').getAttribute('aria-selected')).toBe('true')
     expect(progress().values).toEqual({ '1:1': 3 })
+  })
+})
+
+describe('in-grid hints', () => {
+  const solution = Object.fromEntries(puzzle.cells.flatMap((row, r) =>
+    row.flatMap((square, c) => square.kind === 'play' ? [[`${r}:${c}`, square.solution]] : [])))
+  const hintCount = () => JSON.parse(localStorage.getItem(`${storageKey}:stats`)!).hintCount
+
+  it('replaces notes on the selected empty square without filling it and supports undo and redo', () => {
+    const values = { '1:1': solution['1:1'] }
+    const notes = { '2:2': [9], '1:4': [1, 2] }
+    renderPlayer(values, notes)
+    select('2:2')
+    click(control('Give me a hint'))
+
+    const candidates = hintCandidates(puzzle, values, '2:2')
+    expect(progress()).toMatchObject({
+      values,
+      notes: { ...notes, '2:2': candidates },
+    })
+    expectSelection('2:2')
+    expect(cell('2:2').querySelector('.cell-number')).toBeNull()
+    expect(Array.from(cell('2:2').querySelectorAll('.note-grid span'))
+      .map((note) => note.textContent).filter(Boolean)).toEqual(candidates.map(String))
+    expect(container.querySelector('.game-message')?.textContent).not.toContain('Hint:')
+    expect(hintCount()).toBe(1)
+
+    click(control('Undo'))
+    expect(progress()).toMatchObject({ values, notes })
+    click(control('Redo'))
+    expect(progress().notes['2:2']).toEqual(candidates)
+    expect(hintCount()).toBe(1)
+  })
+
+  it.each([0, 0.999])('chooses a random empty square when the selection is filled (random %s)', (random) => {
+    vi.spyOn(Math, 'random').mockReturnValue(random)
+    const values = { ...solution }
+    delete values['1:2']
+    delete values['2:2']
+    renderPlayer(values)
+    select('1:1')
+    click(control('Give me a hint'))
+
+    const target = random === 0 ? '1:2' : '2:2'
+    expectSelection(target)
+    expect(progress().values).toEqual(values)
+    expect(progress().notes).toEqual({ [target]: [solution[target]] })
+    expect(hintCount()).toBe(1)
+  })
+
+  it('clears only one incorrect entry on a full grid, with an undoable persisted change', () => {
+    const values = {
+      ...solution,
+      '1:1': solution['1:1'] % 9 + 1,
+      '1:2': solution['1:2'] % 9 + 1,
+    }
+    renderPlayer(values, { '1:1': [9] })
+    select('5:5')
+    click(control('Check my grid'))
+    click(control('Give me a hint'))
+
+    const remaining: Record<string, number> = { ...values }
+    delete remaining['1:1']
+    expect(progress()).toMatchObject({ values: remaining, notes: {}, completed: false })
+    expectSelection('1:1')
+    expect(container.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0)
+    expect(hintCount()).toBe(1)
+    click(control('Undo'))
+    expect(progress()).toMatchObject({ values, notes: { '1:1': [9] } })
+    click(control('Redo'))
+    expect(progress()).toMatchObject({ values: remaining, notes: {} })
+    click(control('Give me a hint'))
+    expect(progress().values).toEqual(remaining)
+    expect(progress().notes['1:1']).toEqual([solution['1:1']])
+    expect(hintCount()).toBe(2)
+  })
+})
+
+describe('checking the board', () => {
+  const solution = Object.fromEntries(puzzle.cells.flatMap((row, r) =>
+    row.flatMap((square, c) => square.kind === 'play' ? [[`${r}:${c}`, square.solution]] : [])))
+  const incorrectCells = () =>
+    Array.from(container.querySelectorAll('[aria-invalid="true"]'))
+      .map((element) => element.getAttribute('data-cell-key'))
+  const wrongDigit = solution['1:1'] % 9 + 1
+
+  it.each(['across', 'down'])('does not flag correct digits in a conflicting %s run', (direction) => {
+    const [first, second] = puzzle.runs.find((run) => run.direction === direction)!.cells
+    const correctKey = coordinateKey(first!)
+    const wrongKey = coordinateKey(second!)
+    renderPlayer({ [correctKey]: solution[correctKey] })
+    click(control('Check my grid'))
+    expect(incorrectCells()).toEqual([])
+
+    select(wrongKey)
+    press(String(solution[correctKey]))
+    expect(incorrectCells()).toEqual([])
+    click(control('Check my grid'))
+    expect(incorrectCells()).toEqual([wrongKey])
+  })
+
+  it.each(['digit', 'notes', 'erase'])('clears check feedback after editing %s until another check', (edit) => {
+    renderPlayer({ '1:1': wrongDigit, '1:2': solution['1:2'] })
+    expect(incorrectCells()).toEqual([])
+    click(control('Check my grid'))
+    expect(incorrectCells()).toEqual(['1:1'])
+
+    if (edit === 'digit') {
+      select('1:1')
+      press(String(wrongDigit))
+    } else if (edit === 'notes') {
+      select('1:4')
+      click(control('Notes off'))
+      press('3')
+    } else {
+      select('1:2')
+      click(control('Erase'))
+    }
+
+    expect(incorrectCells()).toEqual([])
+    select('2:2')
+    click(control('Give me a hint'))
+    expect(incorrectCells()).toEqual([])
+    click(control('Check my grid'))
+    expect(incorrectCells()).toEqual(['1:1'])
+  })
+
+  it('clears check feedback on undo and redo rather than restoring stale highlights', () => {
+    renderPlayer({ '1:1': wrongDigit })
+    select('1:2')
+    press(String(solution['1:2']))
+    click(control('Check my grid'))
+    expect(incorrectCells()).toEqual(['1:1'])
+
+    click(control('Undo'))
+    expect(incorrectCells()).toEqual([])
+    click(control('Check my grid'))
+    expect(incorrectCells()).toEqual(['1:1'])
+    click(control('Redo'))
+    expect(incorrectCells()).toEqual([])
+    click(control('Check my grid'))
+    expect(incorrectCells()).toEqual(['1:1'])
   })
 })
 
