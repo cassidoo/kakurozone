@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   coordinateKey, countSolutions, dailyDifficulty, generateDailyPuzzle,
-  generateLegacyPuzzle, generatePuzzle, gradePuzzle, puzzleSizeForSeed,
+  generateLegacyPuzzle, generatePuzzle, gradePuzzle, hintCandidates, puzzleSizeForSeed,
   solveLogically, validatePuzzleStructure, validateSolution,
 } from '.'
 import type { KakuroPuzzle } from '.'
@@ -73,8 +73,57 @@ describe('connected seeded Kakuro', () => {
     })
     const first = Object.keys(solved)[0]!
     const wrong = { ...solved, [first]: solved[first] === 9 ? 8 : 9 }
-    expect(validateSolution(puzzle, wrong).valid).toBe(false)
+    expect(validateSolution(puzzle, wrong)).toEqual({
+      complete: true, valid: false, incorrectCells: [first],
+    })
     expect(validateSolution(puzzle, {}).complete).toBe(false)
+  })
+
+  it.each(['across', 'down'])('only flags the wrong digit in a duplicated %s run', (direction) => {
+    const puzzle = generatePuzzle('validation', 7, 'Easy')
+    const solved = solutionValues(puzzle)
+    const [first, second] = puzzle.runs.find((run) => run.direction === direction)!.cells
+    const correctKey = coordinateKey(first!)
+    const wrongKey = coordinateKey(second!)
+    const values = { [correctKey]: solved[correctKey]!, [wrongKey]: solved[correctKey]! }
+
+    expect(validateSolution(puzzle, values)).toEqual({
+      complete: false, valid: false, incorrectCells: [wrongKey],
+    })
+  })
+})
+
+describe('hint candidates', () => {
+  const source = generateLegacyPuzzle('hint-candidates', 7)
+  const digits = [[2, 5], [6, 1]]
+  const puzzle: KakuroPuzzle = {
+    ...source,
+    cells: Array.from({ length: 7 }, (_, row) =>
+      Array.from({ length: 7 }, (_, col) => {
+        const solution = digits[row - 1]?.[col - 1]
+        return solution === undefined
+          ? { kind: 'block' }
+          : { kind: 'play', solution, acrossRunId: `a${row}`, downRunId: `d${col}` }
+      })),
+    runs: [
+      { id: 'a1', direction: 'across', sum: 7, cells: [{ row: 1, col: 1 }, { row: 1, col: 2 }] },
+      { id: 'a2', direction: 'across', sum: 7, cells: [{ row: 2, col: 1 }, { row: 2, col: 2 }] },
+      { id: 'd1', direction: 'down', sum: 8, cells: [{ row: 1, col: 1 }, { row: 2, col: 1 }] },
+      { id: 'd2', direction: 'down', sum: 6, cells: [{ row: 1, col: 2 }, { row: 2, col: 2 }] },
+    ],
+  }
+
+  it('intersects both clues, excludes repeats, and retains multiple possibilities', () => {
+    expect(hintCandidates(puzzle, {}, '1:1')).toEqual([1, 2, 3, 5, 6])
+  })
+
+  it.each(['1:2', '2:1'])('uses a correct crossing entry at %s to narrow the notes', (key) => {
+    expect(hintCandidates(puzzle, { [key]: solutionValues(puzzle)[key]! }, '1:1')).toEqual([2])
+  })
+
+  it('ignores incorrect entries, including ones that would exclude the answer', () => {
+    expect(hintCandidates(puzzle, { '1:2': 2, '2:1': 2 }, '1:1')).toEqual([1, 2, 3, 5, 6])
+    expect(hintCandidates(puzzle, { '1:2': 2, '2:1': 6 }, '1:1')).toEqual([2])
   })
 })
 

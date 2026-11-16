@@ -1,4 +1,4 @@
-import type { CellValues, Coordinate, KakuroPuzzle, Run } from './types'
+import type { CellValues, Coordinate, KakuroPuzzle } from './types'
 import { coordinateKey } from './types'
 
 const sameCoordinate = (left: Coordinate, right: Coordinate): boolean =>
@@ -136,9 +136,6 @@ export const validatePuzzleStructure = (puzzle: KakuroPuzzle): readonly string[]
   return errors
 }
 
-const valuesForRun = (run: Run, values: CellValues): readonly (number | undefined)[] =>
-  run.cells.map((coordinate) => values[coordinateKey(coordinate)])
-
 export interface SolutionValidation {
   readonly complete: boolean
   readonly valid: boolean
@@ -161,24 +158,6 @@ export const validateSolution = (
       else if (value !== cell.solution) incorrect.add(key)
     })
   })
-
-  for (const run of puzzle.runs) {
-    const runValues = valuesForRun(run, values)
-    const filled = runValues.filter((value): value is number => value !== undefined)
-    if (new Set(filled).size !== filled.length) {
-      run.cells.forEach((coordinate) => {
-        if (values[coordinateKey(coordinate)] !== undefined) {
-          incorrect.add(coordinateKey(coordinate))
-        }
-      })
-    }
-    if (
-      filled.length === run.cells.length &&
-      filled.reduce((sum, value) => sum + value, 0) !== run.sum
-    ) {
-      run.cells.forEach((coordinate) => incorrect.add(coordinateKey(coordinate)))
-    }
-  }
 
   return { complete, valid: complete && incorrect.size === 0, incorrectCells: [...incorrect] }
 }
